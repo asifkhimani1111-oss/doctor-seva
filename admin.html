@@ -1,0 +1,432 @@
+
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#087443">
+<title>DOCTOR SEVA - Admin</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f7f5;color:#18352a}
+header{background:#087443;color:white;text-align:center;padding:22px 12px}
+header h1{margin:0;font-size:27px}
+header p{margin:7px 0 0;font-size:14px}
+main{max-width:750px;margin:20px auto;padding:0 13px}
+.card{background:white;padding:18px;border-radius:14px;margin-bottom:17px;box-shadow:0 3px 13px #0000000d}
+h2{font-size:20px;color:#087443;margin:0 0 15px}
+input{width:100%;padding:13px;border:1px solid #ccd9d1;border-radius:9px;font-size:16px;margin:7px 0}
+button{border:0;border-radius:9px;padding:12px 15px;font-size:14px;font-weight:bold;cursor:pointer;margin:5px 4px 5px 0}
+.primary{background:#087443;color:white}
+.secondary{background:#e8f2ec;color:#087443}
+.danger{background:#ffeded;color:#b3261e}
+.doctor{border:1px solid #dce9e1;border-radius:12px;padding:14px;margin:12px 0}
+.doctor h3{color:#087443;margin:0 0 9px}
+.doctor p{font-size:14px;margin:7px 0;overflow-wrap:anywhere}
+.photo{width:90px;height:90px;border-radius:50%;object-fit:cover;border:2px solid #dce9e1;margin:8px 0}
+.status{display:inline-block;padding:5px 9px;border-radius:20px;font-size:12px;background:#fff5d9;color:#775600}
+.approved{background:#e2f5e9;color:#087443}
+.rejected{background:#ffeded;color:#b3261e}
+#message,#loginMessage{display:none;padding:12px;border-radius:9px;margin-top:12px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.success{display:block!important;background:#e2f5e9;color:#087443}
+.error{display:block!important;background:#ffeded;color:#b3261e}
+.hidden{display:none!important}
+.hint{font-size:12px;color:#68766e;line-height:1.5}
+footer{text-align:center;padding:20px;color:#718078;font-size:12px}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>DOCTOR SEVA</h1>
+<p>Admin Dashboard</p>
+</header>
+
+<main>
+
+<section class="card" id="loginSection">
+<h2>Admin Login</h2>
+<input type="email" id="email" placeholder="Admin Email" autocomplete="username">
+<input type="password" id="password" placeholder="Admin Password" autocomplete="current-password">
+<button class="primary" id="loginBtn">Login કરો</button>
+<div id="loginMessage"></div>
+</section>
+
+<section id="dashboard" class="hidden">
+
+<div class="card">
+<h2>Admin Dashboard</h2>
+<p id="adminInfo" class="hint"></p>
+<button class="secondary" id="refreshBtn">માહિતી Refresh કરો</button>
+<button class="danger" id="logoutBtn">Logout</button>
+<div id="message"></div>
+</div>
+
+<div class="card">
+<h2>ડૉક્ટરોની યાદી</h2>
+<div id="doctorList">
+<p class="hint">ડૉક્ટરોની માહિતી લોડ થઈ રહી છે...</p>
+</div>
+</div>
+
+</section>
+</main>
+
+<footer>© DOCTOR SEVA Admin</footer>
+
+<script type="module">
+
+import {auth,db} from "./firebase.js";
+
+import {
+ signInWithEmailAndPassword,
+ onAuthStateChanged,
+ signOut
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+
+import {
+ collection,
+ onSnapshot,
+ doc,
+ updateDoc,
+ getDoc,
+ writeBatch
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+const ADMIN_UID = "uaKl7L4HoNTWWOUp1tHc9xLrA1l2";
+
+const loginSection=document.getElementById("loginSection");
+const dashboard=document.getElementById("dashboard");
+const doctorList=document.getElementById("doctorList");
+const messageBox=document.getElementById("message");
+const loginMessage=document.getElementById("loginMessage");
+const loginBtn=document.getElementById("loginBtn");
+
+let doctors=[];
+let unsubscribe=null;
+
+function showMessage(text,type="success"){
+ messageBox.textContent=text;
+ messageBox.className=type;
+}
+
+function showLoginMessage(text,type="error"){
+ loginMessage.textContent=text;
+ loginMessage.className=type;
+}
+
+function element(tag,text,className){
+ const el=document.createElement(tag);
+ el.textContent=text;
+ if(className)el.className=className;
+ return el;
+}
+
+function addButton(parent,text,className,callback){
+ const btn=document.createElement("button");
+ btn.textContent=text;
+ btn.className=className;
+ btn.addEventListener("click",callback);
+ parent.appendChild(btn);
+}
+
+function statusLabel(status){
+ if(status==="approved"){
+  return element("span","મંજૂર","status approved");
+ }
+ if(status==="rejected"){
+  return element("span","Reject થયેલ","status rejected");
+ }
+ return element("span","મંજૂરી બાકી","status");
+}
+
+function renderDoctors(){
+ doctorList.replaceChildren();
+
+ if(doctors.length===0){
+  doctorList.appendChild(
+   element("p","હાલમાં કોઈ ડૉક્ટર Registration નથી.","hint")
+  );
+  return;
+ }
+
+ doctors.forEach((doctor)=>{
+  const card=document.createElement("div");
+  card.className="doctor";
+
+  if(doctor.photoBase64){
+   const photo=document.createElement("img");
+   photo.className="photo";
+   photo.src=doctor.photoBase64;
+   photo.alt="ડૉક્ટરનો ફોટો";
+   card.appendChild(photo);
+  }
+
+  const fullName=(doctor.name||"")+" "+(doctor.surname||"");
+
+  card.appendChild(
+   element("h3",fullName.trim()||"નામ આપ્યું નથી")
+  );
+
+  card.appendChild(statusLabel(doctor.status));
+  card.appendChild(element("p","ક્લિનિક: "+(doctor.clinicName||"માહિતી નથી")));
+  card.appendChild(element("p","ગામ: "+(doctor.area||"માહિતી નથી")));
+  card.appendChild(element("p","મોબાઇલ: "+(doctor.phone||"માહિતી નથી")));
+  card.appendChild(element("p","Email: "+(doctor.email||"માહિતી નથી")));
+  card.appendChild(element("p","સૂચનાઓ: "+(doctor.instructions||"કોઈ સૂચના નથી")));
+
+  if(doctor.status==="approved"){
+   card.appendChild(element(
+    "p",
+    doctor.adminActive===true?"Admin સ્થિતિ: ON":"Admin સ્થિતિ: OFF",
+    "hint"
+   ));
+
+   card.appendChild(element(
+    "p",
+    doctor.isOpen===true?"Clinic સ્થિતિ: OPEN":"Clinic સ્થિતિ: CLOSED",
+    "hint"
+   ));
+  }
+
+  if(doctor.status!=="approved"){
+   addButton(card,"Approve કરો","primary",()=>approveDoctor(doctor));
+  }
+
+  if(doctor.status!=="rejected"){
+   addButton(card,"Reject કરો","danger",()=>rejectDoctor(doctor));
+  }
+
+  if(doctor.status==="approved"){
+   addButton(
+    card,
+    doctor.adminActive===true?"Admin OFF કરો":"Admin ON કરો",
+    "secondary",
+    ()=>toggleDoctor(doctor)
+   );
+  }
+
+  doctorList.appendChild(card);
+ });
+}
+
+async function approveDoctor(doctor){
+ if(!confirm("આ ડૉક્ટરને મંજૂરી આપવી છે?"))return;
+
+ try{
+  if(!doctor.name||!doctor.surname||
+     !doctor.clinicName||!doctor.area||!doctor.phone){
+   showMessage("ડૉક્ટરની જરૂરી માહિતી અધૂરી છે.","error");
+   return;
+  }
+
+  const batch=writeBatch(db);
+
+  batch.update(doc(db,"doctorProfiles",doctor.id),{
+   status:"approved",
+   isOpen:false
+  });
+
+  batch.set(doc(db,"publicDoctors",doctor.id),{
+   name:doctor.name,
+   surname:doctor.surname,
+   clinicName:doctor.clinicName,
+   area:doctor.area,
+   phone:doctor.phone,
+   instructions:doctor.instructions||"",
+   photoBase64:doctor.photoBase64||"",
+   isOpen:false,
+   adminActive:false
+  });
+
+  await batch.commit();
+  showMessage("ડૉક્ટરને મંજૂરી મળી. હવે Admin ON કરી શકશે.");
+
+ }catch(error){
+  console.error(error);
+  showMessage("મંજૂરી Error: "+error.code+" — "+error.message,"error");
+ }
+}
+
+async function rejectDoctor(doctor){
+ if(!confirm("આ ડૉક્ટરનું Registration Reject કરવું છે?"))return;
+
+ try{
+  const profileRef=doc(db,"doctorProfiles",doctor.id);
+  const publicRef=doc(db,"publicDoctors",doctor.id);
+  const publicSnap=await getDoc(publicRef);
+  const batch=writeBatch(db);
+
+  batch.update(profileRef,{
+   status:"rejected",
+   isOpen:false
+  });
+
+  if(publicSnap.exists()){
+   batch.update(publicRef,{
+    adminActive:false,
+    isOpen:false
+   });
+  }
+
+  await batch.commit();
+  showMessage("ડૉક્ટરનું Registration Reject થયું.");
+
+ }catch(error){
+  console.error(error);
+  showMessage("Reject Error: "+error.code+" — "+error.message,"error");
+ }
+}
+
+async function toggleDoctor(doctor){
+ const next=!doctor.adminActive;
+
+ if(!confirm(next
+  ?"આ ડૉક્ટરને Admin ON કરવો છે?"
+  :"આ ડૉક્ટરને Admin OFF કરવો છે?"))return;
+
+ try{
+  const batch=writeBatch(db);
+
+  batch.update(doc(db,"publicDoctors",doctor.id),{
+   adminActive:next,
+   isOpen:next?doctor.isOpen===true:false
+  });
+
+  if(!next){
+   batch.update(doc(db,"doctorProfiles",doctor.id),{
+    isOpen:false
+   });
+  }
+
+  await batch.commit();
+
+  showMessage(next
+   ?"Admin ON થયો. હવે Doctor પોતાની Clinic OPEN કરી શકશે."
+   :"Admin OFF થયો. Clinic પણ CLOSED કરવામાં આવી.");
+
+ }catch(error){
+  console.error(error);
+  showMessage("સ્થિતિ બદલવાની Error: "+error.code+" — "+error.message,"error");
+ }
+}
+
+function startDashboard(user){
+ if(unsubscribe){
+  unsubscribe();
+  unsubscribe=null;
+ }
+
+ loginSection.classList.add("hidden");
+ dashboard.classList.remove("hidden");
+
+ document.getElementById("adminInfo").textContent=
+  "Admin UID: "+user.uid;
+
+ unsubscribe=onSnapshot(
+  collection(db,"doctorProfiles"),
+  async(snapshot)=>{
+   const list=[];
+
+   for(const item of snapshot.docs){
+    const data=item.data();
+    let adminActive=false;
+    let publicIsOpen=false;
+
+    try{
+     const publicSnap=await getDoc(doc(db,"publicDoctors",item.id));
+
+     if(publicSnap.exists()){
+      adminActive=publicSnap.data().adminActive===true;
+      publicIsOpen=publicSnap.data().isOpen===true;
+     }
+    }catch(error){
+     console.error(error);
+    }
+
+    list.push({
+     id:item.id,
+     ...data,
+     adminActive,
+     isOpen:publicIsOpen
+    });
+   }
+
+   doctors=list;
+   renderDoctors();
+  },
+  (error)=>{
+   console.error(error);
+   showMessage("ડૉક્ટરોની યાદી Error: "+error.code+" — "+error.message,"error");
+  }
+ );
+}
+
+loginBtn.addEventListener("click",async()=>{
+ const email=document.getElementById("email").value.trim();
+ const password=document.getElementById("password").value;
+
+ if(!email||!password){
+  showLoginMessage("Email અને Password લખો.");
+  return;
+ }
+
+ loginBtn.disabled=true;
+ loginBtn.textContent="Login થઈ રહ્યું છે...";
+
+ try{
+  const result=await signInWithEmailAndPassword(auth,email,password);
+
+  if(result.user.uid!==ADMIN_UID){
+   await signOut(auth);
+   showLoginMessage("આ એકાઉન્ટ Admin નથી. UID: "+result.user.uid);
+  }
+
+ }catch(error){
+  console.error("Admin Login Error:",error);
+  showLoginMessage(
+   "Login Error: "+error.code+" — "+error.message,
+   "error"
+  );
+ }finally{
+  loginBtn.disabled=false;
+  loginBtn.textContent="Login કરો";
+ }
+});
+
+onAuthStateChanged(auth,(user)=>{
+ if(!user){
+  if(unsubscribe){
+   unsubscribe();
+   unsubscribe=null;
+  }
+
+  dashboard.classList.add("hidden");
+  loginSection.classList.remove("hidden");
+  return;
+ }
+
+ if(user.uid!==ADMIN_UID){
+  showLoginMessage("આ એકાઉન્ટ Admin નથી. UID: "+user.uid);
+  signOut(auth);
+  return;
+ }
+
+ startDashboard(user);
+});
+
+document.getElementById("logoutBtn").addEventListener("click",()=>{
+ signOut(auth);
+});
+
+document.getElementById("refreshBtn").addEventListener("click",()=>{
+ if(auth.currentUser?.uid===ADMIN_UID){
+  showMessage("માહિતી આપમેળે અપડેટ થાય છે.");
+ }
+});
+
+</script>
+</body>
+</html>
