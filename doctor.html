@@ -1,0 +1,936 @@
+
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#087443">
+<title>DOCTOR SEVA - Doctor</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f7f5;color:#18352a}
+header{background:#087443;color:white;text-align:center;padding:22px 12px}
+header h1{margin:0;font-size:27px}
+header p{margin:7px 0 0;font-size:14px}
+main{max-width:650px;margin:20px auto;padding:0 13px}
+.card{background:white;padding:19px;border-radius:14px;margin-bottom:17px;box-shadow:0 3px 13px #0000000d}
+h2{font-size:20px;color:#087443;margin:0 0 15px}
+label{display:block;font-weight:bold;font-size:14px;margin:14px 0 7px}
+input,textarea{width:100%;padding:13px;border:1px solid #ccd9d1;border-radius:9px;font-size:16px}
+textarea{min-height:100px;resize:vertical}
+button{width:100%;padding:14px;border:0;border-radius:9px;background:#087443;color:white;font-size:16px;font-weight:bold;margin-top:14px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.secondary{background:#e8f2ec;color:#087443}
+.logout{background:#b3261e}
+.callButton{display:block;text-align:center;text-decoration:none;background:#087443;color:white;padding:14px;border-radius:9px;font-weight:bold;margin-top:14px}
+.hidden{display:none!important}
+#photoPreview{width:115px;height:115px;border-radius:50%;object-fit:cover;border:3px solid #dce9e1;display:block;margin:12px auto}
+#dashboardMessage,#authMessage{display:none;padding:12px;border-radius:9px;margin-top:12px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.success{display:block!important;background:#e2f5e9;color:#087443}
+.error{display:block!important;background:#ffeded;color:#b3261e}
+.status{padding:11px;border-radius:8px;background:#fff5d9;color:#775600;font-size:14px;margin:12px 0;line-height:1.5}
+.status.good{background:#e2f5e9;color:#087443}
+.status.bad{background:#ffeded;color:#b3261e}
+.hint{font-size:12px;color:#68766e;line-height:1.5;margin-top:6px}
+.patient{border:1px solid #dce9e1;border-radius:11px;padding:13px;margin:12px 0}
+.patient h3{color:#087443;margin:0 0 9px;font-size:17px}
+.patient p{font-size:14px;margin:7px 0;overflow-wrap:anywhere}
+.patientStatus{display:inline-block;padding:5px 9px;border-radius:20px;background:#fff5d9;color:#775600;font-size:12px}
+.patientStatus.seen{background:#e2f5e9;color:#087443}
+.patientPhoto{width:130px;height:130px;object-fit:cover;border-radius:12px;border:2px solid #dce9e1;margin:10px 0;display:block}
+.seenBtn{width:auto;padding:10px 14px;margin-top:12px;font-size:14px}
+.seenDone{background:#e2f5e9;color:#087443;padding:10px;border-radius:8px;font-size:13px;margin-top:12px}
+#patientMessage{display:none;padding:10px;border-radius:8px;margin-top:10px;font-size:13px;line-height:1.5}
+footer{text-align:center;padding:20px;color:#718078;font-size:12px}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>DOCTOR SEVA</h1>
+<p>Doctor Registration & Dashboard</p>
+</header>
+
+<main>
+
+<section class="card" id="authSection">
+
+<h2>ડૉક્ટર Login</h2>
+
+<label>Email</label>
+<input type="email" id="loginEmail" placeholder="તમારું Email" autocomplete="username">
+
+<label>Password</label>
+<input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
+
+<button id="loginBtn">Login કરો</button>
+
+<hr style="border:0;border-top:1px solid #eee;margin:22px 0">
+
+<h2>નવા ડૉક્ટરનું Registration</h2>
+
+<label>Email</label>
+<input type="email" id="regEmail" placeholder="Email દાખલ કરો" autocomplete="email">
+
+<label>Password</label>
+<input type="password" id="regPassword" placeholder="ઓછામાં ઓછા 6 અક્ષર" autocomplete="new-password">
+
+<button id="registerBtn">Registration કરો</button>
+
+<div class="hint">
+Registration પછી Admin ની મંજૂરી મળ્યા બાદ જ તમારું ક્લિનિક દર્દીઓને દેખાશે.
+</div>
+
+<div id="authMessage"></div>
+
+</section>
+
+<section class="card hidden" id="dashboard">
+
+<h2>ડૉક્ટર Dashboard</h2>
+
+<div id="approvalStatus" class="status"></div>
+<div id="adminStatus" class="status"></div>
+<div id="clinicStatus" class="status"></div>
+<div id="expiryStatus" class="status"></div>
+
+<a id="adminCallLink" class="callButton hidden" href="tel:9426852334">
+મુદત પૂરી થઈ — Admin ને કૉલ કરો: 9426852334
+</a>
+
+<div class="card" style="padding:14px;background:#f8fbf9">
+<h2>દર્દીઓની નોંધણી</h2>
+<p class="hint">તમારી ક્લિનિક માટે આવેલી દર્દીઓની નોંધણીઓ અહીં દેખાશે.</p>
+<div id="patientList">
+<p class="hint">દર્દીઓની માહિતી લોડ થઈ રહી છે...</p>
+</div>
+<div id="patientMessage"></div>
+</div>
+
+<form id="profileForm">
+
+<label>ડૉક્ટરનો ફોટો</label>
+<img id="photoPreview" alt="Doctor photo preview">
+
+<input type="file" id="photoInput" accept="image/*">
+
+<div class="hint">
+ફોટો નાનો રાખવામાં આવશે જેથી Firebase ની Free plan મર્યાદા જળવાય.
+</div>
+
+<label>નામ *</label>
+<input id="doctorName" maxlength="60" required placeholder="ડૉક્ટરનું નામ">
+
+<label>અટક *</label>
+<input id="doctorSurname" maxlength="60" required placeholder="ડૉક્ટરની અટક">
+
+<label>ક્લિનિકનું નામ *</label>
+<input id="clinicName" maxlength="100" required placeholder="ક્લિનિકનું નામ">
+
+<label>ગામ *</label>
+<input id="village" maxlength="80" required placeholder="ગામનું નામ">
+
+<label>મોબાઇલ નંબર *</label>
+<input id="doctorPhone" type="tel" inputmode="numeric"
+maxlength="10" minlength="10" pattern="[0-9]{10}"
+required placeholder="10 અંકનો મોબાઇલ નંબર">
+
+<label>ક્લિનિક માટે સૂચનાઓ</label>
+<textarea id="instructions" maxlength="500"
+placeholder="દર્દીઓ માટે સૂચનાઓ લખો (વૈકલ્પિક)"></textarea>
+
+<div class="hint">
+ઉદાહરણ: રવિવારે ક્લિનિક બંધ રહેશે.
+</div>
+
+<button type="submit" id="saveBtn">માહિતી સેવ કરો</button>
+
+</form>
+
+<button id="openBtn" class="secondary" disabled>
+ક્લિનિક OPEN / CLOSED
+</button>
+
+<div class="hint">
+આ બટનથી ફક્ત તમારી ક્લિનિકની સ્થિતિ બદલાશે. Admin નું ON/OFF તમારા હાથમાં નથી.
+</div>
+
+<button id="logoutBtn" class="logout">Logout</button>
+
+<div id="dashboardMessage"></div>
+
+</section>
+
+</main>
+
+<footer>© DOCTOR SEVA</footer>
+
+<script type="module">
+
+import {auth,db} from "./firebase.js";
+
+import {
+ createUserWithEmailAndPassword,
+ signInWithEmailAndPassword,
+ onAuthStateChanged,
+ signOut
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+
+import {
+ doc,
+ getDoc,
+ setDoc,
+ updateDoc,
+ collection,
+ query,
+ where,
+ onSnapshot
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+const ADMIN_UID="T6HtvOLrm5VYXHUuzuU5FZRZxGf2";
+const ADMIN_PHONE="9426852334";
+
+const authSection=document.getElementById("authSection");
+const dashboard=document.getElementById("dashboard");
+const authMessage=document.getElementById("authMessage");
+const dashboardMessage=document.getElementById("dashboardMessage");
+const patientList=document.getElementById("patientList");
+const patientMessage=document.getElementById("patientMessage");
+
+let currentUser=null;
+let profile=null;
+let publicProfile=null;
+let photoData="";
+let loadingProfile=false;
+let creatingProfile=false;
+let unsubscribePatients=null;
+let unsubscribePublic=null;
+let expiryTimer=null;
+
+function message(element,text,type){
+ element.textContent=text;
+ element.className=type;
+}
+
+function getFormData(){
+ return {
+  name:document.getElementById("doctorName").value.trim(),
+  surname:document.getElementById("doctorSurname").value.trim(),
+  clinicName:document.getElementById("clinicName").value.trim(),
+  area:document.getElementById("village").value.trim(),
+  phone:document.getElementById("doctorPhone").value.trim(),
+  instructions:document.getElementById("instructions").value.trim()
+ };
+}
+
+function fillForm(data){
+ document.getElementById("doctorName").value=data.name||"";
+ document.getElementById("doctorSurname").value=data.surname||"";
+ document.getElementById("clinicName").value=data.clinicName||"";
+ document.getElementById("village").value=data.area||"";
+ document.getElementById("doctorPhone").value=data.phone||"";
+ document.getElementById("instructions").value=data.instructions||"";
+
+ photoData=data.photoBase64||"";
+ document.getElementById("photoPreview").src=photoData;
+}
+
+function getExpiryMillis(){
+ if(publicProfile?.expiresAt &&
+    typeof publicProfile.expiresAt.toMillis==="function"){
+  return publicProfile.expiresAt.toMillis();
+ }
+ return 0;
+}
+
+function activationValid(){
+ return publicProfile?.adminActive===true &&
+        getExpiryMillis()>Date.now();
+}
+
+function formatDate(timestamp){
+ if(!timestamp || typeof timestamp.toDate!=="function"){
+  return "સમય ઉપલબ્ધ નથી";
+ }
+
+ return timestamp.toDate().toLocaleString("gu-IN",{
+  dateStyle:"medium",
+  timeStyle:"short"
+ });
+}
+
+function updateDashboardStatus(){
+
+ if(!profile)return;
+
+ const approval=document.getElementById("approvalStatus");
+ const admin=document.getElementById("adminStatus");
+ const clinic=document.getElementById("clinicStatus");
+ const expiryStatus=document.getElementById("expiryStatus");
+ const openBtn=document.getElementById("openBtn");
+ const callLink=document.getElementById("adminCallLink");
+
+ const valid=activationValid();
+ const expiry=getExpiryMillis();
+ const expired=publicProfile?.adminActive===true &&
+               expiry>0 && expiry<=Date.now();
+
+ if(profile.status==="approved"){
+  approval.textContent="તમારું એકાઉન્ટ Admin દ્વારા મંજૂર છે.";
+  approval.className="status good";
+ }else if(profile.status==="rejected"){
+  approval.textContent="તમારું Registration Reject થયું છે. Admin નો સંપર્ક કરો.";
+  approval.className="status bad";
+ }else{
+  approval.textContent="તમારું એકાઉન્ટ Admin ની મંજૂરી માટે Pending છે.";
+  approval.className="status";
+ }
+
+ if(valid){
+  admin.textContent="Admin Status: ON — તમારું એકાઉન્ટ સક્રિય છે.";
+  admin.className="status good";
+
+  expiryStatus.textContent="30 દિવસની મુદત: "+formatDate(publicProfile.expiresAt);
+  expiryStatus.className="status good";
+
+ }else if(expired){
+
+  admin.textContent="Admin Status: ON — પરંતુ 30 દિવસની મુદત પૂરી થઈ.";
+  admin.className="status bad";
+
+  expiryStatus.textContent="તમારી 30 દિવસની મુદત પૂરી થઈ ગઈ છે. ફરી ચાલુ કરવા Admin નો સંપર્ક કરો.";
+  expiryStatus.className="status bad";
+
+ }else{
+
+  admin.textContent="Admin Status: OFF — Admin ચાલુ કરે ત્યાં સુધી ક્લિનિક બંધ રહેશે.";
+  admin.className="status bad";
+
+  expiryStatus.textContent="ક્લિનિક ચાલુ કરવાની મંજૂરી હજી મળી નથી.";
+  expiryStatus.className="status";
+
+ }
+
+ const clinicIsOpen=valid && profile.isOpen===true &&
+                    publicProfile?.isOpen===true;
+
+ if(clinicIsOpen){
+  clinic.textContent="તમારી ક્લિનિક: OPEN";
+  clinic.className="status good";
+ }else{
+  clinic.textContent="તમારી ક્લિનિક: CLOSED";
+  clinic.className="status";
+ }
+
+ const canControl=profile.status==="approved" && valid;
+
+ openBtn.disabled=!canControl;
+ openBtn.textContent=clinicIsOpen
+  ?"ક્લિનિક CLOSED કરો"
+  :"ક્લિનિક OPEN કરો";
+
+ callLink.classList.toggle("hidden",!expired);
+
+ if(expiryTimer){
+  clearTimeout(expiryTimer);
+  expiryTimer=null;
+ }
+
+ if(valid){
+  const remaining=expiry-Date.now();
+
+  expiryTimer=setTimeout(()=>{
+   updateDashboardStatus();
+  },Math.min(remaining+100,2147480000));
+ }
+}
+
+async function compressPhoto(file){
+ const image=await createImageBitmap(file);
+
+ let width=image.width;
+ let height=image.height;
+ const maxSide=500;
+
+ if(width>maxSide||height>maxSide){
+  const scale=Math.min(maxSide/width,maxSide/height);
+  width=Math.round(width*scale);
+  height=Math.round(height*scale);
+ }
+
+ const canvas=document.createElement("canvas");
+ canvas.width=width;
+ canvas.height=height;
+
+ const context=canvas.getContext("2d");
+ context.drawImage(image,0,0,width,height);
+
+ let quality=0.7;
+ let result=canvas.toDataURL("image/jpeg",quality);
+
+ while(result.length>180000 && quality>0.35){
+  quality-=0.1;
+  result=canvas.toDataURL("image/jpeg",quality);
+ }
+
+ if(result.length>180000){
+  throw new Error("ફોટો હજી મોટો છે. નાનો ફોટો પસંદ કરો.");
+ }
+
+ return result;
+}
+
+async function markPatientSeen(caseId,button){
+
+ if(!currentUser||!profile||profile.status!=="approved"){
+  message(patientMessage,"મંજૂર ડૉક્ટર જ દર્દીની નોંધણી તપાસેલી કરી શકે છે.","error");
+  return;
+ }
+
+ button.disabled=true;
+ button.textContent="અપડેટ થઈ રહ્યું છે...";
+
+ try{
+
+  await updateDoc(doc(db,"patientCases",caseId),{
+   status:"seen"
+  });
+
+  message(patientMessage,"દર્દીની નોંધણી તપાસેલી તરીકે અપડેટ થઈ ગઈ છે.","success");
+
+ }catch(error){
+
+  console.error("Mark seen error:",error);
+
+  message(
+   patientMessage,
+   "સ્ટેટસ બદલી શકાયું નથી: "+error.code+" — "+error.message,
+   "error"
+  );
+
+  button.disabled=false;
+  button.textContent="તપાસી લીધું";
+
+ }
+}
+
+function renderPatients(snapshot){
+
+ patientList.replaceChildren();
+
+ if(snapshot.empty){
+  const empty=document.createElement("p");
+  empty.className="hint";
+  empty.textContent="હાલમાં કોઈ દર્દીની નોંધણી મળી નથી.";
+  patientList.appendChild(empty);
+  return;
+ }
+
+ const cases=snapshot.docs.map(item=>({
+  id:item.id,
+  ...item.data()
+ }));
+
+ cases.sort((a,b)=>{
+  const aTime=a.createdAt?.toMillis?.()||0;
+  const bTime=b.createdAt?.toMillis?.()||0;
+  return bTime-aTime;
+ });
+
+ cases.forEach(patient=>{
+
+  const card=document.createElement("div");
+  card.className="patient";
+
+  const fullName=
+   (patient.patientName||"")+" "+
+   (patient.surname||"");
+
+  const heading=document.createElement("h3");
+  heading.textContent=fullName.trim()||"નામ ઉપલબ્ધ નથી";
+  card.appendChild(heading);
+
+  const status=document.createElement("span");
+  status.className="patientStatus";
+
+  if(patient.status==="seen"){
+   status.classList.add("seen");
+   status.textContent="તપાસેલી નોંધણી";
+  }else if(patient.status==="completed"){
+   status.classList.add("seen");
+   status.textContent="પૂર્ણ થયેલી નોંધણી";
+  }else{
+   status.textContent="નવી નોંધણી";
+  }
+
+  card.appendChild(status);
+
+  if(patient.patientPhoto &&
+     typeof patient.patientPhoto==="string" &&
+     patient.patientPhoto.startsWith("data:image/")){
+
+   const photo=document.createElement("img");
+   photo.className="patientPhoto";
+   photo.src=patient.patientPhoto;
+   photo.alt="દર્દીનો ફોટો";
+   photo.loading="lazy";
+   card.appendChild(photo);
+  }
+
+  const details=[
+   "ઉંમર: "+(patient.age??"માહિતી નથી"),
+   "ગામ: "+(patient.village||"માહિતી નથી"),
+   "મોબાઇલ: "+(patient.patientPhone||"માહિતી નથી"),
+   "નોંધણી સમય: "+formatDate(patient.createdAt)
+  ];
+
+  details.forEach(detail=>{
+   const p=document.createElement("p");
+   p.textContent=detail;
+   card.appendChild(p);
+  });
+
+  if(patient.status==="new"){
+
+   const seenButton=document.createElement("button");
+   seenButton.type="button";
+   seenButton.className="seenBtn";
+   seenButton.textContent="તપાસી લીધું";
+
+   seenButton.addEventListener("click",()=>{
+    markPatientSeen(patient.id,seenButton);
+   });
+
+   card.appendChild(seenButton);
+
+  }else if(patient.status==="seen"){
+
+   const done=document.createElement("div");
+   done.className="seenDone";
+   done.textContent="✓ આ નોંધણી તપાસેલી છે.";
+   card.appendChild(done);
+
+  }else if(patient.status==="completed"){
+
+   const done=document.createElement("div");
+   done.className="seenDone";
+   done.textContent="✓ આ નોંધણી પૂર્ણ થઈ છે.";
+   card.appendChild(done);
+
+  }
+
+  patientList.appendChild(card);
+ });
+}
+
+function startPatientListener(user){
+
+ if(unsubscribePatients){
+  unsubscribePatients();
+  unsubscribePatients=null;
+ }
+
+ patientList.innerHTML='<p class="hint">દર્દીઓની માહિતી લોડ થઈ રહી છે...</p>';
+
+ const patientQuery=query(
+  collection(db,"patientCases"),
+  where("doctorUid","==",user.uid)
+ );
+
+ unsubscribePatients=onSnapshot(
+  patientQuery,
+  (snapshot)=>{
+   renderPatients(snapshot);
+   patientMessage.textContent="";
+   patientMessage.className="";
+  },
+  (error)=>{
+   console.error("Patient List Error:",error);
+   message(
+    patientMessage,
+    "દર્દીઓની યાદી લોડ થઈ શકી નથી: "+error.code+" — "+error.message,
+    "error"
+   );
+  }
+ );
+}
+
+function startPublicListener(user){
+
+ if(unsubscribePublic){
+  unsubscribePublic();
+  unsubscribePublic=null;
+ }
+
+ unsubscribePublic=onSnapshot(
+  doc(db,"publicDoctors",user.uid),
+  (snapshot)=>{
+
+   publicProfile=snapshot.exists()?snapshot.data():null;
+
+   updateDashboardStatus();
+
+  },
+  (error)=>{
+   console.error("Public Doctor Listener:",error);
+   message(
+    dashboardMessage,
+    "Admin સ્થિતિ લોડ થઈ શકી નથી: "+error.code+" — "+error.message,
+    "error"
+   );
+  }
+ );
+}
+
+async function loadDoctor(user){
+
+ if(loadingProfile)return;
+ loadingProfile=true;
+
+ try{
+
+  const profileRef=doc(db,"doctorProfiles",user.uid);
+  const profileSnap=await getDoc(profileRef);
+
+  if(!profileSnap.exists()){
+   message(authMessage,"ડૉક્ટર પ્રોફાઇલ મળી નથી. Admin નો સંપર્ક કરો.","error");
+   await signOut(auth);
+   return;
+  }
+
+  profile=profileSnap.data();
+
+  const publicRef=doc(db,"publicDoctors",user.uid);
+  const publicSnap=await getDoc(publicRef);
+
+  publicProfile=publicSnap.exists()?publicSnap.data():null;
+
+  authSection.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+
+  fillForm(profile);
+  updateDashboardStatus();
+
+  startPatientListener(user);
+  startPublicListener(user);
+
+ }catch(error){
+
+  console.error(error);
+  message(
+   authMessage,
+   "પ્રોફાઇલ લોડ થઈ શકી નથી: "+error.code+" — "+error.message,
+   "error"
+  );
+
+ }finally{
+  loadingProfile=false;
+ }
+}
+
+document.getElementById("photoInput").addEventListener("change",async(event)=>{
+
+ const file=event.target.files[0];
+ if(!file)return;
+
+ if(!file.type.startsWith("image/")){
+  message(dashboardMessage,"યોગ્ય ફોટો પસંદ કરો.","error");
+  return;
+ }
+
+ try{
+
+  photoData=await compressPhoto(file);
+  document.getElementById("photoPreview").src=photoData;
+
+  message(dashboardMessage,"ફોટો તૈયાર છે. હવે માહિતી સેવ કરો.","success");
+
+ }catch(error){
+
+  message(dashboardMessage,error.message||"ફોટો તૈયાર થઈ શક્યો નથી.","error");
+
+ }
+});
+
+document.getElementById("registerBtn").addEventListener("click",async()=>{
+
+ const email=document.getElementById("regEmail").value.trim();
+ const password=document.getElementById("regPassword").value;
+ const button=document.getElementById("registerBtn");
+
+ if(!email||password.length<6){
+  message(authMessage,"યોગ્ય Email અને ઓછામાં ઓછા 6 અક્ષરનો Password લખો.","error");
+  return;
+ }
+
+ button.disabled=true;
+ creatingProfile=true;
+
+ try{
+
+  const result=await createUserWithEmailAndPassword(auth,email,password);
+
+  await setDoc(doc(db,"doctorProfiles",result.user.uid),{
+   email:email,
+   status:"pending",
+   name:"",
+   surname:"",
+   clinicName:"",
+   area:"",
+   phone:"",
+   instructions:"",
+   photoBase64:"",
+   isOpen:false
+  });
+
+  message(authMessage,"Registration થઈ ગયું. હવે તમારી વિગતો ભરો.","success");
+
+  await loadDoctor(result.user);
+
+ }catch(error){
+
+  console.error(error);
+
+  message(
+   authMessage,
+   "Registration Error: "+error.code+" — "+error.message,
+   "error"
+  );
+
+ }finally{
+
+  creatingProfile=false;
+  button.disabled=false;
+
+ }
+});
+
+document.getElementById("loginBtn").addEventListener("click",async()=>{
+
+ const email=document.getElementById("loginEmail").value.trim();
+ const password=document.getElementById("loginPassword").value;
+ const button=document.getElementById("loginBtn");
+
+ if(!email||!password){
+  message(authMessage,"Email અને Password લખો.","error");
+  return;
+ }
+
+ button.disabled=true;
+
+ try{
+
+  await signInWithEmailAndPassword(auth,email,password);
+
+ }catch(error){
+
+  console.error(error);
+
+  message(
+   authMessage,
+   "Login Error: "+error.code+" — "+error.message,
+   "error"
+  );
+
+ }finally{
+
+  button.disabled=false;
+
+ }
+});
+
+onAuthStateChanged(auth,async(user)=>{
+
+ currentUser=user;
+
+ if(!user){
+
+  if(unsubscribePatients){
+   unsubscribePatients();
+   unsubscribePatients=null;
+  }
+
+  if(unsubscribePublic){
+   unsubscribePublic();
+   unsubscribePublic=null;
+  }
+
+  if(expiryTimer){
+   clearTimeout(expiryTimer);
+   expiryTimer=null;
+  }
+
+  authSection.classList.remove("hidden");
+  dashboard.classList.add("hidden");
+  profile=null;
+  publicProfile=null;
+
+  return;
+ }
+
+ if(user.isAnonymous || user.uid===ADMIN_UID){
+  await signOut(auth);
+  return;
+ }
+
+ if(creatingProfile)return;
+
+ await loadDoctor(user);
+});
+
+document.getElementById("profileForm").addEventListener("submit",async(event)=>{
+
+ event.preventDefault();
+
+ if(!currentUser||!profile)return;
+
+ const data=getFormData();
+
+ if(!/^[0-9]{10}$/.test(data.phone)){
+  message(dashboardMessage,"10 અંકનો યોગ્ય મોબાઇલ નંબર લખો.","error");
+  return;
+ }
+
+ if(profile.status==="rejected"){
+  message(dashboardMessage,"Registration Reject થયું છે. Admin નો સંપર્ક કરો.","error");
+  return;
+ }
+
+ const saveBtn=document.getElementById("saveBtn");
+ saveBtn.disabled=true;
+
+ try{
+
+  await updateDoc(doc(db,"doctorProfiles",currentUser.uid),{
+   ...data,
+   photoBase64:photoData
+  });
+
+  profile={...profile,...data,photoBase64:photoData};
+
+  if(profile.status==="approved" && publicProfile){
+
+   await updateDoc(doc(db,"publicDoctors",currentUser.uid),{
+    name:data.name,
+    surname:data.surname,
+    clinicName:data.clinicName,
+    area:data.area,
+    phone:data.phone,
+    instructions:data.instructions,
+    photoBase64:photoData
+   });
+
+   publicProfile={
+    ...publicProfile,
+    ...data,
+    photoBase64:photoData
+   };
+  }
+
+  updateDashboardStatus();
+
+  message(dashboardMessage,"તમારી માહિતી સેવ થઈ ગઈ છે.","success");
+
+ }catch(error){
+
+  console.error(error);
+
+  message(
+   dashboardMessage,
+   "માહિતી સેવ Error: "+error.code+" — "+error.message,
+   "error"
+  );
+
+ }finally{
+
+  saveBtn.disabled=false;
+
+ }
+});
+
+document.getElementById("openBtn").addEventListener("click",async()=>{
+
+ if(!currentUser||!profile||!publicProfile)return;
+
+ if(profile.status!=="approved"){
+  message(dashboardMessage,"Admin મંજૂરી આપે પછી જ ક્લિનિક ચાલુ કરી શકશો.","error");
+  return;
+ }
+
+ if(!activationValid()){
+  updateDashboardStatus();
+  message(dashboardMessage,"30 દિવસની મુદત પૂરી થઈ છે અથવા Admin ON બાકી છે. Admin નો સંપર્ક કરો.","error");
+  return;
+ }
+
+ const nextStatus=!(profile.isOpen===true && publicProfile.isOpen===true);
+ const button=document.getElementById("openBtn");
+ button.disabled=true;
+
+ try{
+
+  await updateDoc(doc(db,"publicDoctors",currentUser.uid),{
+   isOpen:nextStatus
+  });
+
+  await updateDoc(doc(db,"doctorProfiles",currentUser.uid),{
+   isOpen:nextStatus
+  });
+
+  profile.isOpen=nextStatus;
+  publicProfile.isOpen=nextStatus;
+
+  updateDashboardStatus();
+
+  message(
+   dashboardMessage,
+   nextStatus?"તમારી ક્લિનિક OPEN થઈ ગઈ છે.":"તમારી ક્લિનિક CLOSED થઈ ગઈ છે. Admin Status ON જ રહેશે.",
+   "success"
+  );
+
+ }catch(error){
+
+  console.error(error);
+
+  message(
+   dashboardMessage,
+   "Clinic Error: "+error.code+" — "+error.message,
+   "error"
+  );
+
+  updateDashboardStatus();
+
+ }finally{
+
+  updateDashboardStatus();
+
+ }
+});
+
+document.getElementById("logoutBtn").addEventListener("click",async()=>{
+
+ if(unsubscribePatients){
+  unsubscribePatients();
+  unsubscribePatients=null;
+ }
+
+ if(unsubscribePublic){
+  unsubscribePublic();
+  unsubscribePublic=null;
+ }
+
+ if(expiryTimer){
+  clearTimeout(expiryTimer);
+  expiryTimer=null;
+ }
+
+ await signOut(auth);
+
+});
+
+</script>
+
+</body>
+</html>
