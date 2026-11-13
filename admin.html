@@ -1,0 +1,532 @@
+
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#087443">
+<title>DOCTOR SEVA - Admin</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:#f2f5f3;font-family:Arial,sans-serif;color:#183329}
+.wrap{max-width:900px;margin:auto}
+header{background:#087443;color:white;padding:20px;border-radius:14px;margin-bottom:16px}
+h1{margin:0 0 6px;font-size:25px}
+h2{font-size:19px}
+.card{background:white;padding:17px;border-radius:13px;margin-bottom:14px;box-shadow:0 2px 8px #0000000d}
+input,select{width:100%;padding:13px;margin:7px 0 12px;border:1px solid #ccd8d1;border-radius:8px;font-size:16px;background:white}
+button{border:0;padding:12px 16px;border-radius:8px;background:#087443;color:white;font-size:15px;font-weight:bold;margin:5px 5px 5px 0}
+button:disabled{opacity:.5}
+.secondary{background:#52645a}
+.doctor,.patient{border:1px solid #dce6df;padding:14px;border-radius:10px;margin:12px 0;overflow-wrap:anywhere}
+.doctor-photo{width:110px;height:110px;object-fit:cover;border-radius:12px;border:2px solid #dce6df;margin:5px 0 12px;display:block}
+.muted{color:#64756c;font-size:14px;line-height:1.7}
+.status{font-weight:bold;color:#087443}
+#message{padding:10px;border-radius:8px;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.hidden{display:none}
+.patient img{width:100px;height:100px;object-fit:cover;border-radius:10px;margin:8px 0}
+.tag{display:inline-block;background:#e5f4e9;color:#155b35;padding:5px 9px;border-radius:20px;font-size:13px;font-weight:bold;margin:5px 0}
+.tag.seen{background:#e7efff;color:#244d91}
+.tag.completed{background:#eee8ff;color:#60419b}
+.empty{padding:15px;text-align:center;color:#64756c}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+<header>
+<h1>DOCTOR SEVA</h1>
+<div>Admin Dashboard</div>
+</header>
+
+<section id="loginBox" class="card">
+<h2>Admin Login</h2>
+<label>Admin Gmail</label>
+<input id="email" type="email" placeholder="Admin Gmail નાખો">
+<label>Password</label>
+<input id="password" type="password" placeholder="Password નાખો">
+<button id="loginBtn">Login</button>
+</section>
+
+<div id="message" class="hidden"></div>
+
+<section id="dashboard" class="hidden">
+
+<div class="card">
+<h2>Admin Dashboard</h2>
+<div class="muted">Admin: asifkhimani502@gmail.com</div>
+<button id="refreshBtn">બધી માહિતી Refresh કરો</button>
+<button id="logoutBtn" class="secondary">Logout</button>
+</div>
+
+<div class="card">
+<h2>ડૉક્ટરોની યાદી</h2>
+<div class="muted">નવા ડૉક્ટરને પહેલાં Approve કરો. ત્યારબાદ 30 દિવસ માટે Activate કરો.</div>
+<div id="doctorList">લોડ થઈ રહ્યું છે...</div>
+</div>
+
+<div class="card">
+<h2>દર્દીઓની યાદી</h2>
+<div class="muted">દરેક દર્દી તેના પોતાના ડૉક્ટરની UID પ્રમાણે બતાવવામાં આવશે.</div>
+
+<label>ડૉક્ટર પ્રમાણે જુઓ</label>
+<select id="doctorFilter">
+<option value="all">બધા ડૉક્ટરો</option>
+</select>
+
+<label>દર્દીનું સ્ટેટસ</label>
+<select id="statusFilter">
+<option value="all">બધા સ્ટેટસ</option>
+<option value="new">નવા દર્દી (new)</option>
+<option value="seen">તપાસ થઈ (seen)</option>
+<option value="completed">પૂર્ણ (completed)</option>
+</select>
+
+<input id="patientSearch" type="search" placeholder="દર્દીનું નામ, ગામ અથવા મોબાઇલ શોધો">
+<div id="patientCount" class="muted"></div>
+<div id="patientList">દર્દીઓની યાદી લોડ થઈ રહી છે...</div>
+</div>
+
+</section>
+</div>
+
+<script type="module">
+import {auth,db} from "./firebase.js";
+
+import {
+signInWithEmailAndPassword,
+onAuthStateChanged,
+signOut
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+
+import {
+collection,
+doc,
+getDocs,
+updateDoc,
+setDoc,
+Timestamp,
+serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+const ADMIN_UID="T6HtvOLrm5VYXHUuzuU5FZRZxGf2";
+
+const $=id=>document.getElementById(id);
+
+let doctorsCache=[];
+let patientsCache=[];
+let publicDoctorsCache={};
+
+function showMessage(text,error=false){
+$("message").textContent=text;
+$("message").classList.remove("hidden");
+$("message").style.background=error?"#fdebea":"#e5f4e9";
+$("message").style.color=error?"#a32119":"#155b35";
+}
+
+function hideMessage(){
+$("message").classList.add("hidden");
+}
+
+function escapeHTML(value){
+return String(value??"").replace(/[&<>"']/g,char=>({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#039;"
+})[char]);
+}
+
+function getExpiryDate(value){
+if(!value)return null;
+if(typeof value.toDate==="function")return value.toDate();
+const date=new Date(value);
+return Number.isNaN(date.getTime())?null:date;
+}
+
+function isActive(data){
+const expiry=getExpiryDate(data?.expiresAt);
+return data?.adminActive===true &&
+expiry!==null &&
+expiry.getTime()>Date.now();
+}
+
+onAuthStateChanged(auth,async user=>{
+if(!user){
+$("loginBox").classList.remove("hidden");
+$("dashboard").classList.add("hidden");
+return;
+}
+
+if(user.uid!==ADMIN_UID){
+await signOut(auth);
+showMessage("આ Gmailને Admin પરવાનગી નથી.",true);
+$("loginBox").classList.remove("hidden");
+$("dashboard").classList.add("hidden");
+return;
+}
+
+hideMessage();
+$("loginBox").classList.add("hidden");
+$("dashboard").classList.remove("hidden");
+await loadAll();
+});
+
+$("loginBtn").addEventListener("click",async()=>{
+const email=$("email").value.trim();
+const password=$("password").value;
+
+if(!email||!password){
+showMessage("Gmail અને Password બંને નાખો.",true);
+return;
+}
+
+try{
+await signInWithEmailAndPassword(auth,email,password);
+}catch(error){
+showMessage("Login થઈ શક્યું નથી: "+error.message,true);
+}
+});
+
+$("logoutBtn").addEventListener("click",async()=>{
+await signOut(auth);
+});
+
+$("refreshBtn").addEventListener("click",loadAll);
+
+async function loadAll(){
+hideMessage();
+await loadDoctors();
+
+if(!$("message").classList.contains("hidden"))return;
+
+await loadPatients();
+}
+
+async function loadDoctors(){
+$("doctorList").textContent="લોડ થઈ રહ્યું છે...";
+
+try{
+const [snapshot,publicSnapshot]=await Promise.all([
+getDocs(collection(db,"doctorProfiles")),
+getDocs(collection(db,"publicDoctors"))
+]);
+
+publicDoctorsCache={};
+
+publicSnapshot.forEach(item=>{
+publicDoctorsCache[item.id]=item.data();
+});
+
+doctorsCache=snapshot.docs.map(item=>({
+uid:item.id,
+profile:item.data(),
+publicData:publicDoctorsCache[item.id]||null
+}));
+
+if(doctorsCache.length===0){
+$("doctorList").textContent="હજુ કોઈ ડૉક્ટરનું રજીસ્ટ્રેશન નથી.";
+return;
+}
+
+$("doctorList").innerHTML=doctorsCache.map((doctor,index)=>{
+const p=doctor.profile;
+const publicData=doctor.publicData;
+const approved=p.status==="approved";
+const active=isActive(publicData);
+const expiry=getExpiryDate(publicData?.expiresAt);
+
+let statusText="Pending Approval";
+
+if(approved)statusText="Approved";
+if(active)statusText="Admin Status: ON";
+
+if(approved&&publicData?.adminActive===true&&!active){
+statusText="30 દિવસ પૂરા - Expired";
+}
+
+let actionButtons="";
+
+if(!approved){
+actionButtons=`<button data-action="approve" data-index="${index}">Approve કરો</button>`;
+}else{
+actionButtons=`<button data-action="activate" data-index="${index}">
+${active?"30 દિવસ ફરી Activate કરો":"30 દિવસ Activate કરો"}
+</button>`;
+}
+
+const photo=typeof p.doctorPhoto==="string"&&
+p.doctorPhoto.startsWith("data:image/");
+
+return `
+<div class="doctor">
+
+${photo
+?`<img class="doctor-photo" src="${escapeHTML(p.doctorPhoto)}" alt="ડૉક્ટરનો ફોટો">`
+:`<div class="muted">ડૉક્ટરનો ફોટો ઉપલબ્ધ નથી.</div>`}
+
+<h3>${escapeHTML((p.name||"")+" "+(p.surname||""))}</h3>
+
+<div class="muted">
+Gmail: ${escapeHTML(p.email||"માહિતી નથી")}<br>
+ક્લિનિક: ${escapeHTML(p.clinicName||"માહિતી નથી")}<br>
+ગામ/વિસ્તાર: ${escapeHTML(p.area||"માહિતી નથી")}<br>
+મોબાઇલ: ${escapeHTML(p.phone||"માહિતી નથી")}<br>
+UID: ${escapeHTML(doctor.uid)}
+</div>
+
+<p class="status">${escapeHTML(statusText)}</p>
+
+${expiry?`<div class="muted">Expiry: ${escapeHTML(expiry.toLocaleString("en-IN"))}</div>`:""}
+
+${actionButtons}
+
+</div>`;
+}).join("");
+
+}catch(error){
+$("doctorList").textContent="ડૉક્ટરોની યાદી લોડ થઈ શકી નથી.";
+showMessage("ડૉક્ટર Error: "+error.message,true);
+}
+}
+
+$("doctorList").addEventListener("click",async event=>{
+const button=event.target.closest("button[data-action]");
+if(!button)return;
+
+const index=Number(button.dataset.index);
+const doctor=doctorsCache[index];
+if(!doctor)return;
+
+const uid=doctor.uid;
+const profile=doctor.profile;
+const action=button.dataset.action;
+
+button.disabled=true;
+hideMessage();
+
+try{
+
+if(action==="approve"){
+
+if(profile.status==="approved"){
+showMessage("આ ડૉક્ટર પહેલેથી Approved છે.");
+return;
+}
+
+await updateDoc(doc(db,"doctorProfiles",uid),{
+status:"approved"
+});
+
+await setDoc(doc(db,"publicDoctors",uid),{
+doctorUid:uid,
+name:profile.name||"",
+surname:profile.surname||"",
+clinicName:profile.clinicName||"",
+area:profile.area||"",
+phone:profile.phone||"",
+instructions:profile.instructions||"",
+...(profile.doctorPhoto?{doctorPhoto:profile.doctorPhoto}:{}),
+adminActive:false,
+isOpen:false,
+expiresAt:null
+},{merge:true});
+
+showMessage("ડૉક્ટર Approved થઈ ગયા. હવે Activate કરી શકો છો.");
+}
+
+if(action==="activate"){
+
+if(profile.status!=="approved"){
+showMessage("પહેલાં ડૉક્ટરને Approve કરો.",true);
+return;
+}
+
+const expiryDate=new Date(Date.now()+30*24*60*60*1000);
+
+await setDoc(doc(db,"publicDoctors",uid),{
+doctorUid:uid,
+name:profile.name||"",
+surname:profile.surname||"",
+clinicName:profile.clinicName||"",
+area:profile.area||"",
+phone:profile.phone||"",
+instructions:profile.instructions||"",
+...(profile.doctorPhoto?{doctorPhoto:profile.doctorPhoto}:{}),
+adminActive:true,
+isOpen:true,
+activatedAt:serverTimestamp(),
+expiresAt:Timestamp.fromDate(expiryDate)
+},{merge:true});
+
+showMessage("ડૉક્ટર 30 દિવસ માટે Activate થયા.");
+}
+
+await loadAll();
+
+}catch(error){
+showMessage("કામ પૂર્ણ થયું નથી: "+error.message,true);
+}finally{
+button.disabled=false;
+}
+});
+
+async function loadPatients(){
+$("patientList").textContent="દર્દીઓની યાદી લોડ થઈ રહી છે...";
+
+try{
+const snapshot=await getDocs(collection(db,"patientCases"));
+
+patientsCache=snapshot.docs.map(item=>({
+id:item.id,
+...item.data()
+}));
+
+fillDoctorFilter();
+renderPatients();
+
+}catch(error){
+$("patientList").textContent="દર્દીઓની યાદી લોડ થઈ શકી નથી.";
+showMessage("દર્દીઓનો Error: "+error.message,true);
+}
+}
+
+function doctorName(uid){
+const doctor=doctorsCache.find(d=>d.uid===uid);
+if(!doctor)return "ડૉક્ટરની માહિતી મળી નથી";
+
+const p=doctor.profile;
+return ((p.name||"")+" "+(p.surname||"")).trim()||
+p.clinicName||
+"ડૉક્ટર";
+}
+
+function doctorClinic(uid){
+const data=publicDoctorsCache[uid];
+if(data?.clinicName)return data.clinicName;
+
+const doctor=doctorsCache.find(d=>d.uid===uid);
+return doctor?.profile?.clinicName||"માહિતી નથી";
+}
+
+function fillDoctorFilter(){
+const filter=$("doctorFilter");
+const current=filter.value;
+
+filter.innerHTML='<option value="all">બધા ડૉક્ટરો</option>';
+
+doctorsCache.forEach(doctor=>{
+const p=doctor.profile;
+const name=((p.name||"")+" "+(p.surname||"")).trim()||
+p.clinicName||
+doctor.uid;
+
+const option=document.createElement("option");
+option.value=doctor.uid;
+option.textContent=name;
+filter.appendChild(option);
+});
+
+if([...filter.options].some(option=>option.value===current)){
+filter.value=current;
+}
+}
+
+function formatDate(value){
+const date=getExpiryDate(value);
+return date?date.toLocaleString("en-IN"):"માહિતી નથી";
+}
+
+function patientPhoto(patient){
+const photo=patient.patientPhoto||"";
+if(typeof photo!=="string")return "";
+
+if(photo.startsWith("data:image/")||photo.startsWith("https://")){
+return `<img src="${escapeHTML(photo)}" alt="દર્દીનો ફોટો" loading="lazy">`;
+}
+
+return "";
+}
+
+function renderPatients(){
+const doctorFilter=$("doctorFilter").value;
+const statusFilter=$("statusFilter").value;
+const search=$("patientSearch").value.trim().toLowerCase();
+
+let filtered=patientsCache.filter(patient=>{
+const uid=patient.doctorUid||"";
+const status=patient.status||"new";
+const name=((patient.patientName||patient.name||"")+" "+(patient.surname||patient.patientSurname||"")).toLowerCase();
+const village=String(patient.village||patient.area||"").toLowerCase();
+const phone=String(patient.patientPhone||"").toLowerCase();
+
+if(doctorFilter!=="all"&&uid!==doctorFilter)return false;
+if(statusFilter!=="all"&&status!==statusFilter)return false;
+if(search&&!name.includes(search)&&!village.includes(search)&&!phone.includes(search))return false;
+
+return true;
+});
+
+$("patientCount").textContent=
+"કુલ દર્દીઓ: "+filtered.length+" / "+patientsCache.length;
+
+if(filtered.length===0){
+$("patientList").innerHTML='<div class="empty">આ પસંદગી પ્રમાણે કોઈ દર્દી મળ્યો નથી.</div>';
+return;
+}
+
+filtered.sort((a,b)=>{
+const da=getExpiryDate(a.createdAt)?.getTime()||0;
+const db=getExpiryDate(b.createdAt)?.getTime()||0;
+return db-da;
+});
+
+$("patientList").innerHTML=filtered.map(patient=>{
+const name=((patient.patientName||patient.name||"")+" "+(patient.surname||patient.patientSurname||"")).trim()||"નામ નથી";
+const age=patient.age??"માહિતી નથી";
+const village=patient.village||patient.area||"માહિતી નથી";
+const phone=patient.patientPhone||"માહિતી નથી";
+const uid=patient.doctorUid||"";
+const status=patient.status||"new";
+
+let statusLabel="નવો દર્દી";
+let statusClass="";
+
+if(status==="seen"){
+statusLabel="તપાસ થઈ (seen)";
+statusClass="seen";
+}
+
+if(status==="completed"){
+statusLabel="પૂર્ણ (completed)";
+statusClass="completed";
+}
+
+return `
+<div class="patient">
+<h3>${escapeHTML(name)}</h3>
+<div class="tag ${statusClass}">${escapeHTML(statusLabel)}</div>
+${patientPhoto(patient)}
+<div class="muted">
+ઉંમર: ${escapeHTML(age)}<br>
+ગામ: ${escapeHTML(village)}<br>
+મોબાઇલ: ${escapeHTML(phone)}<br>
+ડૉક્ટર: ${escapeHTML(doctorName(uid))}<br>
+ડૉક્ટર UID: ${escapeHTML(uid||"માહિતી નથી")}<br>
+ક્લિનિક: ${escapeHTML(doctorClinic(uid))}<br>
+નોંધણી સમય: ${escapeHTML(formatDate(patient.createdAt))}
+</div>
+</div>`;
+}).join("");
+}
+
+$("doctorFilter").addEventListener("change",renderPatients);
+$("statusFilter").addEventListener("change",renderPatients);
+$("patientSearch").addEventListener("input",renderPatients);
+
+</script>
+</body>
+</html>
