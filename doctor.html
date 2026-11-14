@@ -1,0 +1,172 @@
+
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#087443">
+<title>DOCTOR SEVA - Doctor Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+  <h1>DOCTOR SEVA</h1>
+  <p>ડૉક્ટર ડેશબોર્ડ</p>
+</header>
+
+<main class="container">
+
+  <section class="card" id="loginSection">
+
+    <h2>ડૉક્ટર Login</h2>
+
+    <form id="loginForm">
+      <label for="email">ઈમેલ</label>
+      <input type="email" id="email" required
+        autocomplete="username" placeholder="તમારો ઈમેલ">
+
+      <label for="password">પાસવર્ડ</label>
+      <input type="password" id="password" required
+        autocomplete="current-password" placeholder="પાસવર્ડ">
+
+      <button type="submit">Login કરો</button>
+    </form>
+
+    <p id="loginMessage" role="status"></p>
+
+    <hr>
+
+    <h3>નવા ડૉક્ટર છો?</h3>
+    <p>DOCTOR SEVA માં નવું એકાઉન્ટ બનાવો.</p>
+
+    <button type="button" id="showRegister">
+      નવું ડૉક્ટર એકાઉન્ટ બનાવો
+    </button>
+
+    <section id="registerSection" class="hidden">
+
+      <hr>
+      <h2>ડૉક્ટર Registration</h2>
+
+      <form id="registerForm">
+
+        <label for="regDoctorName">ડૉક્ટરનું નામ</label>
+        <input type="text" id="regDoctorName" required>
+
+        <label for="regSurname">અટક</label>
+        <input type="text" id="regSurname" required>
+
+        <label for="regEmail">ઈમેલ</label>
+        <input type="email" id="regEmail" required
+          autocomplete="email">
+
+        <label for="regPassword">પાસવર્ડ</label>
+        <input type="password" id="regPassword"
+          minlength="6" required autocomplete="new-password"
+          placeholder="ઓછામાં ઓછા 6 અક્ષર">
+
+        <label for="regClinicName">ક્લિનિકનું નામ</label>
+        <input type="text" id="regClinicName" required>
+
+        <label for="regArea">ગામ / વિસ્તાર</label>
+        <input type="text" id="regArea" required>
+
+        <label for="regPhone">મોબાઇલ નંબર</label>
+        <input type="tel" id="regPhone"
+          maxlength="10" pattern="[0-9]{10}" required>
+
+        <label for="regInstructions">દર્દીઓ માટે સૂચનાઓ</label>
+        <textarea id="regInstructions" rows="3"></textarea>
+
+        <label for="regDoctorPhoto">ક્લિનિક / ડૉક્ટરનો ફોટો (વૈકલ્પિક)</label>
+        <input type="file" id="regDoctorPhoto" accept="image/*">
+
+        <p id="registerPhotoPreview"></p>
+
+        <button type="submit" id="registerButton">
+          Registration કરો
+        </button>
+
+      </form>
+
+      <p id="registerMessage" role="status"></p>
+
+      <button type="button" id="hideRegister">
+        પાછા Login પર જાઓ
+      </button>
+
+    </section>
+
+  </section>
+
+  <section class="card hidden" id="dashboardSection">
+
+    <h2 id="welcomeDoctor">નમસ્તે, ડૉક્ટર</h2>
+
+    <div class="status" id="activationStatus">
+      ક્લિનિકની સ્થિતિ તપાસી રહ્યા છીએ...
+    </div>
+
+    <h3>મારી ક્લિનિકની વિગતો</h3>
+
+    <form id="profileForm">
+
+      <label for="doctorName">ડૉક્ટરનું નામ</label>
+      <input type="text" id="doctorName" required>
+
+      <label for="surname">અટક</label>
+      <input type="text" id="surname" required>
+
+      <label for="clinicName">ક્લિનિકનું નામ</label>
+      <input type="text" id="clinicName" required>
+
+      <label for="area">ગામ / વિસ્તાર</label>
+      <input type="text" id="area" required>
+
+      <label for="phone">મોબાઇલ નંબર</label>
+      <input type="tel" id="phone" maxlength="10" required>
+
+      <label for="instructions">દર્દીઓ માટે સૂચનાઓ</label>
+      <textarea id="instructions" rows="3"
+        placeholder="ક્લિનિક વિશે સૂચનાઓ"></textarea>
+
+      <label for="doctorPhoto">ડૉક્ટરનો ફોટો</label>
+      <input type="file" id="doctorPhoto" accept="image/*">
+
+      <p id="photoPreview"></p>
+
+      <button type="submit" id="saveProfile">
+        પ્રોફાઇલ અને ફોટો સેવ કરો
+      </button>
+
+    </form>
+
+    <div id="profileMessage" role="status"></div>
+
+    <hr>
+
+    <h3>મારા દર્દીઓ</h3>
+
+    <div id="myPatients">
+      દર્દીઓની માહિતી લોડ થઈ રહી છે...
+    </div>
+
+    <button type="button" id="logoutButton">
+      Logout
+    </button>
+
+  </section>
+
+</main>
+
+<footer>
+  © DOCTOR SEVA
+  <p>આ એપ તબીબી ઇમરજન્સી સેવા નથી.</p>
+</footer>
+
+<script type="module" src="doctor.js"></script>
+
+</body>
+</html>
