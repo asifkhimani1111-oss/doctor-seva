@@ -1,0 +1,417 @@
+
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#075e46">
+<title>DOCTOR SEVA - Admin Panel</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f1f5f4;
+  color:#172b25;
+}
+header{
+  background:#075e46;
+  color:white;
+  padding:18px;
+  text-align:center;
+}
+header h2{margin:0}
+.container{
+  max-width:950px;
+  margin:20px auto;
+  padding:12px;
+}
+.card{
+  background:white;
+  padding:18px;
+  border-radius:14px;
+  margin-bottom:15px;
+  box-shadow:0 2px 10px #00000012;
+}
+input{
+  width:100%;
+  padding:13px;
+  border:1px solid #ccc;
+  border-radius:8px;
+  margin:7px 0 12px;
+  font-size:16px;
+}
+button{
+  border:0;
+  padding:11px 15px;
+  border-radius:8px;
+  color:white;
+  background:#075e46;
+  margin:4px;
+  font-size:14px;
+  cursor:pointer;
+}
+.red{background:#c62828}
+.orange{background:#e58b00}
+.blue{background:#1769aa}
+.gray{background:#555}
+.green{background:#16834c}
+.small{font-size:13px;color:#66736e}
+.status{
+  padding:5px 9px;
+  border-radius:20px;
+  background:#e7f4ed;
+  display:inline-block;
+  font-size:13px;
+}
+.hidden{display:none}
+img{
+  width:90px;
+  height:90px;
+  object-fit:cover;
+  border-radius:10px;
+}
+#message{
+  padding:10px;
+  border-radius:8px;
+  margin:10px 0;
+  background:#e8f4ee;
+  white-space:pre-wrap;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>DOCTOR SEVA</h2>
+  <p>Admin Control Panel</p>
+</header>
+
+<div class="container">
+
+  <div id="loginBox" class="card">
+    <h3>Admin Login</h3>
+    <label>Email</label>
+    <input id="email" type="email" placeholder="Admin Email">
+
+    <label>Password</label>
+    <input id="password" type="password" placeholder="Password">
+
+    <button onclick="login()">Login</button>
+    <div id="loginMessage"></div>
+  </div>
+
+  <div id="dashboard" class="hidden">
+
+    <div class="card">
+      <h3>Admin Dashboard</h3>
+      <p id="adminEmail"></p>
+      <button class="red" onclick="logout()">Logout</button>
+      <button class="blue" onclick="loadDoctors()">Refresh</button>
+      <div id="message"></div>
+    </div>
+
+    <div class="card">
+      <h3>ડૉક્ટરોની યાદી</h3>
+      <div id="doctorList">Loading...</div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+
+import { auth, db } from "./firebase.js";
+
+import {
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  Timestamp,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+/*
+  IMPORTANT:
+  અહીં આપેલો Admin UID Firebase Authentication માં
+  તમારા સાચા Admin UID સાથે સરખાવો.
+*/
+const ADMIN_UID = "T6HtvOLrm5VYXHUuzuU5FZRZxGf2";
+
+const loginBox = document.getElementById("loginBox");
+const dashboard = document.getElementById("dashboard");
+const doctorList = document.getElementById("doctorList");
+
+function msg(text){
+  document.getElementById("message").textContent = text;
+}
+
+function escapeHTML(value){
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  })[ch]);
+}
+
+window.login = async function(){
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  if(!email || !password){
+    document.getElementById("loginMessage").textContent =
+      "Email અને Password લખો.";
+    return;
+  }
+
+  try{
+    const result = await signInWithEmailAndPassword(
+      auth, email, password
+    );
+
+    if(result.user.uid !== ADMIN_UID){
+      await signOut(auth);
+      document.getElementById("loginMessage").textContent =
+        "આ એકાઉન્ટ Admin નથી.";
+      return;
+    }
+
+  }catch(error){
+    document.getElementById("loginMessage").textContent =
+      "Login Error: " + error.message;
+  }
+};
+
+onAuthStateChanged(auth, async user => {
+  if(user && user.uid === ADMIN_UID){
+    loginBox.classList.add("hidden");
+    dashboard.classList.remove("hidden");
+    document.getElementById("adminEmail").textContent =
+      "Admin: " + user.email;
+    await loadDoctors();
+  }else{
+    loginBox.classList.remove("hidden");
+    dashboard.classList.add("hidden");
+  }
+});
+
+window.logout = async function(){
+  await signOut(auth);
+};
+
+window.loadDoctors = async function(){
+  doctorList.innerHTML = "Loading...";
+  msg("");
+
+  try{
+    const snapshot = await getDocs(collection(db,"doctorProfiles"));
+
+    if(snapshot.empty){
+      doctorList.innerHTML = "હજુ કોઈ Doctor Registration નથી.";
+      return;
+    }
+
+    doctorList.innerHTML = "";
+
+    snapshot.forEach(item => {
+      const d = item.data();
+      const uid = item.id;
+
+      const approved = d.adminActive === true;
+      const open = d.isOpen === true;
+      const expiry = d.expiresAt?.toDate
+        ? d.expiresAt.toDate().toLocaleDateString("en-IN")
+        : "હજી સેટ નથી";
+
+      const photo = d.doctorPhoto || "";
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      card.innerHTML = `
+        ${photo ? `<img src="${escapeHTML(photo)}" alt="Clinic Photo">` : ""}
+        <h3>${escapeHTML((d.name || "") + " " + (d.surname || ""))}</h3>
+        <p><b>Clinic:</b> ${escapeHTML(d.clinicName || "-")}</p>
+        <p><b>Degree:</b> ${escapeHTML(d.degree || "-")}</p>
+        <p><b>Mobile:</b> ${escapeHTML(d.phone || "-")}</p>
+        <p><b>WhatsApp:</b> ${escapeHTML(d.whatsapp || "-")}</p>
+        <p><b>Address:</b> ${escapeHTML(d.address || "-")}</p>
+        <p><b>Area:</b> ${escapeHTML(d.area || "-")}</p>
+        <p><b>Email:</b> ${escapeHTML(d.email || "-")}</p>
+        <p><b>Doctor UID:</b> <span class="small">${escapeHTML(uid)}</span></p>
+        <p><b>Approval:</b> <span class="status">${approved ? "Approved" : escapeHTML(d.status || "Pending")}</span></p>
+        <p><b>Clinic:</b> ${open ? "ON" : "OFF"}</p>
+        <p><b>Expiry:</b> ${escapeHTML(expiry)}</p>
+
+        <button class="green" data-action="approve">Approve + 30 Days</button>
+        <button class="orange" data-action="toggle">
+          Clinic ${open ? "OFF" : "ON"}
+        </button>
+        <button class="red" data-action="reject">Reject</button>
+        <button class="gray" data-action="remove">Remove Public Listing</button>
+      `;
+
+      card.querySelector('[data-action="approve"]').onclick =
+        () => approveDoctor(uid);
+
+      card.querySelector('[data-action="toggle"]').onclick =
+        () => toggleClinic(uid, !open);
+
+      card.querySelector('[data-action="reject"]').onclick =
+        () => rejectDoctor(uid);
+
+      card.querySelector('[data-action="remove"]').onclick =
+        () => removePublicListing(uid);
+
+      doctorList.appendChild(card);
+    });
+
+  }catch(error){
+    doctorList.innerHTML = "Error: " + escapeHTML(error.message);
+  }
+};
+
+async function approveDoctor(uid){
+  if(!confirm("આ Doctor ને 30 દિવસ માટે Approve કરવો છે?")) return;
+
+  try{
+    const ref = doc(db,"doctorProfiles",uid);
+    const snap = await getDoc(ref);
+
+    if(!snap.exists()){
+      msg("Doctor Profile મળ્યું નથી.");
+      return;
+    }
+
+    const data = snap.data();
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 30);
+
+    const expiry = Timestamp.fromDate(expiryDate);
+
+    const publicData = {
+      ...data,
+      adminActive: true,
+      status: "approved",
+      isOpen: true,
+      expiresAt: expiry,
+      updatedAt: serverTimestamp()
+    };
+
+    await updateDoc(ref,{
+      adminActive:true,
+      status:"approved",
+      isOpen:true,
+      expiresAt:expiry,
+      updatedAt:serverTimestamp()
+    });
+
+    await setDoc(doc(db,"publicDoctors",uid),publicData);
+
+    msg("Doctor Approved. Clinic 30 દિવસ માટે ON થયું.");
+    await loadDoctors();
+
+  }catch(error){
+    msg("Approve Error: " + error.message);
+  }
+}
+
+async function toggleClinic(uid, newValue){
+  try{
+    const ref = doc(db,"doctorProfiles",uid);
+    const snap = await getDoc(ref);
+
+    if(!snap.exists()) return;
+
+    const data = snap.data();
+
+    if(newValue && data.adminActive !== true){
+      msg("પહેલાં Doctor ને Approve કરો.");
+      return;
+    }
+
+    await updateDoc(ref,{
+      isOpen:newValue,
+      updatedAt:serverTimestamp()
+    });
+
+    const publicRef = doc(db,"publicDoctors",uid);
+    const publicSnap = await getDoc(publicRef);
+
+    if(publicSnap.exists()){
+      await updateDoc(publicRef,{
+        isOpen:newValue,
+        updatedAt:serverTimestamp()
+      });
+    }
+
+    msg("Clinic Status બદલાઈ ગયું.");
+    await loadDoctors();
+
+  }catch(error){
+    msg("Status Error: " + error.message);
+  }
+}
+
+async function rejectDoctor(uid){
+  if(!confirm("આ Doctor ને Reject કરવો છે?")) return;
+
+  try{
+    await updateDoc(doc(db,"doctorProfiles",uid),{
+      adminActive:false,
+      status:"rejected",
+      isOpen:false,
+      updatedAt:serverTimestamp()
+    });
+
+    const publicRef = doc(db,"publicDoctors",uid);
+    const publicSnap = await getDoc(publicRef);
+
+    if(publicSnap.exists()){
+      await deleteDoc(publicRef);
+    }
+
+    msg("Doctor Reject થયો.");
+    await loadDoctors();
+
+  }catch(error){
+    msg("Reject Error: " + error.message);
+  }
+}
+
+async function removePublicListing(uid){
+  if(!confirm("આ Clinic ને Patient App માંથી દૂર કરવી છે?")) return;
+
+  try{
+    const ref = doc(db,"publicDoctors",uid);
+    const snap = await getDoc(ref);
+
+    if(snap.exists()){
+      await deleteDoc(ref);
+    }
+
+    msg("Public Listing દૂર થઈ ગઈ.");
+    await loadDoctors();
+
+  }catch(error){
+    msg("Remove Error: " + error.message);
+  }
+}
+
+</script>
+</body>
+</html>
